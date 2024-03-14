@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log/slog"
 	"os"
@@ -43,13 +44,29 @@ func setDefaultSink(ctx context.Context, sink string) error {
 	return nil
 }
 
+var flagVerbose bool
+
+func init() {
+	flag.BoolVar(&flagVerbose, "v", false, "enable verbose logging")
+	flag.Parse()
+	if flagVerbose {
+		slog.SetLogLoggerLevel(slog.LevelDebug)
+	}
+
+}
+
 func main() {
+	flag.Parse()
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 	lo, err := getListOutput(ctx)
 	if err != nil {
 		slog.Error("error getting pactl list output", "error", err)
 		os.Exit(1)
+	}
+
+	for _, sink := range lo.Sinks {
+		slog.Debug("sink", "name", sink.Name, "state", sink.State)
 	}
 
 	var nextIndex int
@@ -59,6 +76,8 @@ func main() {
 			break
 		}
 	}
+
+	slog.Debug("next index", "index", nextIndex, "name", lo.Sinks[nextIndex].Name)
 
 	if err := setDefaultSink(ctx, lo.Sinks[nextIndex].Name); err != nil {
 		slog.Error("error setting default sink", "error", err)
